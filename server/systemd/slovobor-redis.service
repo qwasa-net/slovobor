@@ -1,0 +1,17 @@
+[Unit]
+Description=Slovobor personal REDIS
+
+[Service]
+Type=forking
+Restart=always
+RestartSec=5
+User=slovobor.lool.pw
+Group=www-data
+WorkingDirectory=/home/slovobor.lool.pw/
+PIDFile=/home/slovobor.lool.pw/_redis.pid
+ExecStart=/usr/bin/redis-server /home/slovobor.lool.pw/server/redis.conf
+ExecStop=/bin/kill -s TERM $MAINPID
+PathModified=/home/slovobor.lool.pw/server/systemd/slovobor-redis.service
+
+[Install]
+Alias=slovobor-redis.service

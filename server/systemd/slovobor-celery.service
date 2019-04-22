@@ -1,0 +1,18 @@
+[Unit]
+Description=Slovobor Celery Service
+
+[Service]
+Type=forking
+Restart=always
+RestartSec=5
+User=slovobor.lool.pw
+Group=www-data
+WorkingDirectory=/home/slovobor.lool.pw/slovobor/app/
+PIDFile=/home/slovobor.lool.pw/_celery_worker.pid
+Environment=SLOVOBOR_CONFIG_FILE=/home/slovobor.lool.pw/_config.json
+Environment=DEBUG_LOG=/home/slovobor.lool.pw/_logs/celery_debug.log
+ExecStart=/home/slovobor.lool.pw/_env/bin/python3 /home/slovobor.lool.pw/_env/bin/celery worker --app tgbot.tasks:app --detach --concurrency 1 --loglevel=info --logfile=/home/slovobor.lool.pw/_logs/celery_worker.log --pidfile=/home/slovobor.lool.pw/_celery_worker.pid --workdir /home/slovobor.lool.pw/slovobor/app
+ExecStop=/bin/kill -s TERM $MAINPID
+
+[Install]
+Alias=slovobor-celery.service

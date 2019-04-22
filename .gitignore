@@ -1,0 +1,31 @@
+#
+*.py[ocd]
+__pycache__
+
+# database dumps/samples
+**/*.sqlite
+**/*.sqlite3
+data/*.bz2
+
+#  
+_kakas/
+_env/
+_deploy/
+_logs/
+**/*.log
+
+# real API keys (e.g. `_live_keys.ini`)
+keys/_*
+
+# compiled static files ?
+# www/**
+
+# IDE
+.vscode
+.editorconfig
+.jsbeautifyrc
+.settings
+
+# js builders
+node_modules
+package-lock.json

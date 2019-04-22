@@ -36,6 +36,20 @@ INPUT_MAX_LENGTH = _cfg.get("INPUT_MAX_LENGTH", 40)
 MIN_LENGTH = _cfg.get("MIN_LENGTH", 3)
 MAX_RESULTS = _cfg.get("MAX_RESULTS", 1999)
 
+# TG tokens
+TG_BOT_TOKEN = _cfg.get("TG_BOT_TOKEN", "")
+TG_WEBHOOK_TOKEN = _cfg.get("TG_WEBHOOK_TOKEN", "")
+TG_ADMIN_ID = _cfg.get("TG_ADMIN_ID")
+TG_API_URL = "https://api.telegram.org/bot{token}/{cmd}"
+
+#
+TG_BOT_USE_REDIS = "/home/slovobor.lool.pw/_redis.sock"
+TG_BOT_USE_REDIS_DB = 1
+
+TG_INPUT_MAX_LENGTH = _cfg.get("TG_INPUT_MAX_LENGTH", INPUT_MAX_LENGTH)
+TG_MIN_LENGTH = _cfg.get("TG_MIN_LENGTH", 4)
+TG_MAX_RESULTS = _cfg.get("TG_MAX_RESULTS", 100)
+
 #
 CELERY_BROKER = "redis+socket:///home/slovobor.lool.pw/_redis.sock"
 CELERY_ALWAYS_EAGER = False

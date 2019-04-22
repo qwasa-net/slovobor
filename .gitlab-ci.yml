@@ -1,0 +1,39 @@
+image: python:latest
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONPATH: ".:$CI_PROJECT_DIR/slovobor/app/"
+
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+stages:
+  - test
+  - deploy
+
+before_script:
+  - echo 'hello!'
+  - echo "CI_PROJECT_DIR = ${CI_PROJECT_DIR}"
+  - date
+  - python -V
+  - python -m venv venv
+  - source venv/bin/activate
+  - pip install -r requirements.txt
+
+after_script:
+  - echo 'bye!'
+
+test0:
+  stage: test
+  script:
+    - ls www/index.html
+    - cd slovobor/app/
+    - python webapi.wsgi.py
+    - python tgbot/webhook.wsgi.py
+
+deploy:
+  stage: deploy
+  script:
+    - /bin/true
