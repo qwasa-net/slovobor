@@ -5,13 +5,16 @@ Description=Slovobor personal REDIS
 Type=forking
 Restart=always
 RestartSec=5
-User=slovobor.lool.pw
+TimeoutStartSec=10
+TimeoutStopSec=15
+User=slovobor.tktk.in
 Group=www-data
-WorkingDirectory=/home/slovobor.lool.pw/
-PIDFile=/home/slovobor.lool.pw/_redis.pid
-ExecStart=/usr/bin/redis-server /home/slovobor.lool.pw/server/redis.conf
+UMask=002
+WorkingDirectory=/home/slovobor.tktk.in/
+PIDFile=/home/slovobor.tktk.in/_redis.pid
+ExecStart=/usr/bin/redis-server /home/slovobor.tktk.in/server/redis.conf
 ExecStop=/bin/kill -s TERM $MAINPID
-PathModified=/home/slovobor.lool.pw/server/systemd/slovobor-redis.service
 
 [Install]
 Alias=slovobor-redis.service
+WantedBy=default.target

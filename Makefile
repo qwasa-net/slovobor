@@ -6,11 +6,11 @@ MAKEFILE_DIR := $(dir $(MAKEFILE_PATH))
 HOME_PATH := $(MAKEFILE_DIR)
 MENAME ?= $(shell basename "$(MAKEFILE_DIR)")
 
-SSH_KEY ?= keys/_ssh/slovobor.lool.pw-id_rsa
+SSH_KEY ?= keys/_ssh/slovobor.tktk.in-id_rsa
 SSH_OPTS ?= -p222
 SSH ?= ssh -i $(SSH_KEY) $(SSH_OPTS)
-TARGET ?= slovobor.lool.pw@lool.pw
-TARGET_PATH ?= /home/slovobor.lool.pw
+TARGET ?= slovobor.tktk.in@tktk.in
+TARGET_PATH ?= /home/slovobor.tktk.in
 
 YANDEX_METRIKA_ID ?= $(shell cat keys/_YANDEX_METRIKA_ID 2>/dev/null)
 GOOGLE_TRACKING_ID ?= $(shell cat keys/_GOOGLE_TRACKING_ID 2>/dev/null)
@@ -45,6 +45,7 @@ deploy_remote_install: ## (2) create running environment on TARGET
 install_env:
 	mkdir -pv "$(TARGET_PATH)"
 	mkdir -pv "$(TARGET_PATH)/_logs"
+	touch "$(TARGET_PATH)/_redis.pid" "$(TARGET_PATH)/_celery_worker.pid"
 	test -f "$(TARGET_PATH)/_env/bin/python" || python3 -m venv "$(TARGET_PATH)/_env"
 	"$(TARGET_PATH)/_env/bin/pip" install -U -r "$(TARGET_PATH)/requirements.txt"
 	test -f "$(TARGET_PATH)/_config.json" || echo "{}" > "$(TARGET_PATH)/_config.json"
@@ -58,19 +59,20 @@ deploy_remote_install_system: ## (2-config+su) copy config files for system serv
 	-@echo "========== [2] EDIT CONFIG ==========="
 	-@echo "vim $(TARGET_PATH)/_config.json"
 	-@echo "========== [3] SUDO =================="
-	-@echo # ln -sf $(TARGET_PATH)/server/uwsgi/* /etc/uwsgi/apps-enabled/
-	-@echo ln -sf $(TARGET_PATH)/server/uwsgi/* /etc/uwsgi-emperor/vassals/
-	-@echo ln -sf $(TARGET_PATH)/server/systemd/* /etc/systemd/system/
-	-@echo ln -sf $(TARGET_PATH)/server/nginx.conf /etc/nginx/sites-enabled/slovobor.lool.pw.conf
-	-@echo ln -sf $(TARGET_PATH)/server/logrotate.conf /etc/logrotate.d/slovobor
-	-@echo systemctl reload nginx
-	-@echo # systemctl restart uwsgi.service
-	-@echo systemctl restart uwsgi-emperor.service
-	-@echo systemctl daemon-reload
-	-@echo systemctl enable slovobor-celery
-	-@echo systemctl enable slovobor-redis
-	-@echo systemctl restart slovobor-celery
-	-@echo systemctl restart slovobor-redis
+	-@echo "# ln -sf $(TARGET_PATH)/server/uwsgi/* /etc/uwsgi/apps-enabled/"
+	-@echo "ln -sf $(TARGET_PATH)/server/uwsgi/* /etc/uwsgi-emperor/vassals/"
+	-@echo "# ln -sf $(TARGET_PATH)/server/systemd/* /etc/systemd/system/"
+	-@echo "ln -sf $(TARGET_PATH)/server/nginx.conf /etc/nginx/sites-enabled/slovobor.tktk.in.conf"
+	-@echo "ln -sf $(TARGET_PATH)/server/logrotate.conf /etc/logrotate.d/slovobor"
+	-@echo "systemctl link $(TARGET_PATH)/server/systemd/*"
+	-@echo "systemctl reload nginx"
+	-@echo "# systemctl restart uwsgi.service"
+	-@echo "systemctl restart uwsgi-emperor.service"
+	-@echo "systemctl daemon-reload"
+	-@echo "systemctl enable slovobor-celery"
+	-@echo "systemctl enable slovobor-redis"
+	-@echo "systemctl restart slovobor-celery"
+	-@echo "systemctl restart slovobor-redis"
 	-@echo "======================================"
 	sleep 1
 
@@ -85,8 +87,8 @@ init_db: ## (3) init database
 
 deploy_remote_reload: ## (4) reload services on TARGET
 	$(SSH) $(TARGET) 'touch --no-create \
-	/home/slovobor.lool.pw/server/uwsgi/slovobor-tgbot.ini \
-	/home/slovobor.lool.pw/server/uwsgi/slovobor-web.ini'
+	/home/slovobor.tktk.in/server/uwsgi/slovobor-tgbot.ini \
+	/home/slovobor.tktk.in/server/uwsgi/slovobor-web.ini'
 	-@echo sudo systemctl restart slovobor-celery
 	-@echo sudo systemctl restart slovobor-redis
 
