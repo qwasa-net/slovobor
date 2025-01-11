@@ -1,0 +1,34 @@
+# syntax = docker/dockerfile:experimental
+
+### builder
+FROM golang:alpine as builder
+
+WORKDIR /build
+
+ENV CGO_ENABLED 0
+ENV GOOS linux
+ENV GOCACHE /tmp/go-cache
+ENV GOMODCACHE /tmp/go-cache
+ARG GO_BUILD_FLAGS=-ldflags=-s -w
+
+COPY slvbr /build/slvbr
+
+RUN --mount=type=cache,target=/tmp/go-cache \
+    cd /build/slvbr && \
+    du -sh "${GOMODCACHE}" && \
+    echo "downloading modules ..." && \
+    du -sh "${GOMODCACHE}" && \
+    go mod download -x && \
+    echo "building ..." && \
+    go build ${GO_BUILD_FLAGS} . && \
+    ls -lt /build/slvbr
+
+## runner
+FROM alpine:latest AS runner
+
+
+WORKDIR /
+
+COPY --from=builder /build/slvbr/slvbr.back /slvbr.back
+
+CMD ["/slvbr.back", "-server"]
