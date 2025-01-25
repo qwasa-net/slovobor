@@ -1,3 +1,4 @@
+import bz2
 import argparse
 import itertools
 import json
@@ -327,12 +328,12 @@ def main():
     # reorder tags
     print("reordering tags …")
     if args.best_tag_order:
-        args.tags = reorder_tags(words, args.tags)
+        args.tags = reorder_tags(words, letters)
         print(f"{args.tags=}")
 
     # count ranking and sort for best tag
     print("counting ranking …")
-    words = count_ranking(words, args)
+    words = count_ranking(words, letters)
     words = sorted(words, key=lambda w: w["__ranking"], reverse=False)
     print(f"{words[1000]=}")
     show_boxes(words, args)
@@ -502,20 +503,39 @@ def calculate_tag_splitting(words, dead_letters=None):
 
 def read_input(args):
 
-    infile = sys.stdin if args.input == "-" else open(args.input)
+    if args.input == "-":
+        infile = sys.stdin
+    elif args.input.endswith(".bz2"):
+        infile = bz2.BZ2File(args.input)
+    else:
+        infile = open(args.input)
+
     words = json.load(infile)
 
     if args.morph:
-        words = filter(lambda w: w["morph"] in args.morph, words)
+        # NZ ~ NVA
+        words = filter(
+            lambda w: len(set(w["morph"]).intersection(args.morph)) > 0,
+            words,
+        )
 
     if args.min_length:
-        words = filter(lambda w: len(w["word"]) >= args.min_length, words)
+        words = filter(
+            lambda w: len(w["word"]) >= args.min_length,
+            words,
+        )
 
     if args.no_topo:
-        words = filter(lambda w: not w.get("topo"), words)
+        words = filter(
+            lambda w: not w.get("topo"),
+            words,
+        )
 
     if args.no_nomen:
-        words = filter(lambda w: not w.get("nomen"), words)
+        words = filter(
+            lambda w: not w.get("nomen"),
+            words,
+        )
 
     return words if isinstance(words, list) else list(words)
 
@@ -530,18 +550,19 @@ def count_letters(words, args):
         w = word["word"] if args.case_sensitive else word["word"].lower()
         if args.tags:
             w = list(filter(lambda c: c in args.tags, w))
+        if args.tags_alpha_only is True:
+            w = list(filter(lambda c: c.isalpha(), w))
         lcounter = Counter(w)
         word["__counters"] = lcounter
-        word["__ranking"] = [lcounter.get(c, 0) for c in args.tags]
         letters.update(w)
 
     return words, letters
 
 
-def count_ranking(words, args):
+def count_ranking(words, letters):
     for i, word in enumerate(words):
         lc = word["__counters"]
-        word["__ranking"] = [lc.get(c, 0) for c in args.tags] + [word["__len"]]
+        word["__ranking"] = [lc.get(c, 0) for c in letters] + [word["__len"]]
     return words
 
 
@@ -553,8 +574,9 @@ def parse_args():
     parser.add_argument("--no-topo", action="store_true")
     parser.add_argument("--no-nomen", action="store_true")
     parser.add_argument("--case-sensitive", "-cs", action="store_true")
-    parser.add_argument("--tags", "-f", type=str, default=None)
-    parser.add_argument("--tags-language", "-fl", type=str, default=None)
+    parser.add_argument("--tags", "-t", type=str, default=None)
+    parser.add_argument("--tags-language", "-tl", type=str, default=None)
+    parser.add_argument("--tags-alpha-only", "-tao", action="store_true")
     parser.add_argument("--best-tag-order", "-bfo", action="store_true")
     parser.add_argument("--encoding", "-e", type=str, default="utf-8")
     parser.add_argument("--min-length", "-ml", type=int, default=0)
