@@ -74,16 +74,18 @@ func runServer(dbs []slovobor.DB, cfg Config) {
 }
 
 func doQuery(dbs []slovobor.DB, cfg Config) {
-	db := dbs[0]
-	queryLine, _ := db.StringToTagLine(cfg.Query)
-	fmt.Println("=== QueryRecordFitAll", time.Now())
-	startTime := time.Now()
-	foundCount, foundAll := db.QueryTocFitAll(queryLine, 0, 0)
-	endTime := time.Now()
-	fmt.Printf("QueryRecordFitAll found %d results in %v\n", foundCount, endTime.Sub(startTime))
-	for i := 0; i < foundCount; i++ {
-		txt := db.GetRecordText(foundAll[i])
-		fmt.Printf("[%d]=%s ", foundAll[i], txt)
+	for _, db := range dbs {
+		queryLine, _ := db.StringToTagLine(cfg.Query)
+		log.Println("=== QueryRecordFitAll", time.Now())
+		startTm := time.Now()
+		foundCount, foundAll := db.QueryTocFitAll(queryLine, 0, 0)
+		endTm := time.Now()
+		log.Printf("QueryRecordFitAll found %d results in %v\n", foundCount, endTm.Sub(startTm))
+
+		for i := 0; i < foundCount; i++ {
+			txt := db.GetRecordText(foundAll[i])
+			fmt.Print(txt, " ")
+		}
+		fmt.Println()
 	}
-	fmt.Println()
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"reflect"
@@ -64,13 +63,15 @@ func parseFlags(cfg interface{}, prefix string) {
 			parseFlags(field.Addr().Interface(), flagName)
 
 		case reflect.Slice:
+			var values []string
 			var sep string = fieldType.Tag.Get("sep")
-			if sep == "" {
-				sep = ","
+			if len(defaultValue) > 0 {
+				if sep == "" {
+					sep = ","
+				}
+				values = strings.Split(defaultValue, sep)
 			}
-			var values []string = strings.Split(defaultValue, sep)
 			field.Set(reflect.ValueOf(values))
-			fmt.Println(flagName, values, sep)
 			flag.Func(flagName, "", func(value string) error {
 				values = append(values, value)
 				field.Set(reflect.ValueOf(values))
