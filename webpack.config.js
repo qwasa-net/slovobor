@@ -1,14 +1,15 @@
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const glob = require("glob");
 const path = require('path');
 const webpack = require('webpack');
 
-const HtmlWebpackInlineSourcePlugin = require('html-webpack-inline-source-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const HtmlInlineScriptWebpackPlugin = require('html-inline-script-webpack-plugin');
+const HtmlInlineCSSWebpackPlugin = require('html-inline-css-webpack-plugin').default;
 const HtmlWebpackInlineSVGPlugin = require('html-webpack-inline-svg-plugin');
-const HtmlWebpackPlugin = require('html-webpack-plugin')
-
+const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
-const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
+
 const getLogger = require('webpack-log');
 const log = getLogger({ name: 'webpack-batman' });
 
@@ -26,7 +27,7 @@ module.exports = {
 
     output: {
         path: path.resolve('./www/'),
-        filename: '[name].js'
+        publicPath: '',
     },
 
     module: {
@@ -34,27 +35,26 @@ module.exports = {
             test: /\.css$/i,
             use: [{
                 loader: MiniCssExtractPlugin.loader,
-                options: { minimize: true },
             },
                 'css-loader',
             ],
         },
         {
             test: /\.(jpe?g|png|gif|woff|woff2|eot|otf|ttf|ico)(\?[^\/]+)?$/i,
-            loader: 'file-loader',
-            options: { name: '[name].[ext]', },
+            type: 'asset/resource',
+            generator: { filename: '[name][ext]' }
         },
         {
             test: /\.svg$/i,
-            oneOf: [{
-                issuer: /\.css$/i,
-                loader: 'url-loader', // SVG in CSS
-                options: { encoding: 'base64' }
-            },
-            {
-                loader: 'file-loader', // SVG standalone
-                options: { name: '[name].[ext]', },
-            }
+            oneOf: [
+                {
+                    issuer: /\.css$/i,
+                    type: 'asset/inline', // inline SVG in CSS
+                },
+                {
+                    type: 'asset/resource', // SVG standalone
+                    generator: { filename: '[name][ext]' }
+                }
             ],
 
         },
@@ -63,8 +63,8 @@ module.exports = {
 
     optimization: {
         minimizer: [
+            new CssMinimizerPlugin(),
             new TerserPlugin({
-                cache: false,
                 terserOptions: {
                     toplevel: true,
                     keep_classnames: true,
@@ -87,8 +87,7 @@ module.exports = {
                     output: { beautify: false }
                 },
             }),
-            new OptimizeCSSAssetsPlugin({})
-        ],
+        ]
     },
 
     plugins: [
@@ -104,8 +103,10 @@ module.exports = {
             filename: 'index.html',
             inlineSource: '.(js|css|svg)$',
             template: 'slovobor/web/slovobor.html',
+            inject: 'body',
         }),
-        new HtmlWebpackInlineSourcePlugin(),
+        new HtmlInlineCSSWebpackPlugin(),
         new HtmlWebpackInlineSVGPlugin(),
+        new HtmlInlineScriptWebpackPlugin(),
     ]
 };

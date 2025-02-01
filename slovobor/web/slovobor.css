@@ -155,6 +155,8 @@ section p a {
   margin: 0;
   background-color: #eeeeee;
   text-align: center;
+  overflow: hidden;
+  vertical-align: middle;
 }
 
 #big_input label {
@@ -175,22 +177,23 @@ section p a {
   -webkit-appearance: none;
 }
 
-#big_input input[type='text'] {
+#big_input input#sl_input {
   width: 80%;
   min-width: 10em;
-  padding-right: 1.6em;
+  padding-right: 1.25em;
   background-color: #fefefe;
   text-align: center;
   text-transform: uppercase;
+  border-width: 2px;
 }
 
-#big_input input[type='text']:focus {
+#big_input input#sl_input:focus {
   background-color: #fffff8;
   border-color: #f0b80f;
   /* #feeec4;  */
 }
 
-#big_input input[type='submit'] {
+#big_input input[type='submit'], #big_input input[type='reset'] {
   position: absolute;
   margin: 0 0 0 -1.25em;
   text-align: center;
@@ -199,13 +202,18 @@ section p a {
   color: #808080;
   border-color: transparent;
   background-color: transparent;
+  border-width: 2px;
 }
 
-#big_input input[type='submit']:hover {
+#big_input input[type='reset'] {
+  margin: 0;
+}
+
+#big_input input[type='submit']:hover, #big_input input[type='reset']:hover {
   color: #b00010;
 }
 
-#big_input input[type='submit']:active {
+#big_input input[type='submit']:active, #big_input input[type='reset']:active {
   background-color: #f0b80f;
   color: #b00010;
 }
