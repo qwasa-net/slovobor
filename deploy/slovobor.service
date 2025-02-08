@@ -1,0 +1,28 @@
+[Unit]
+Description=Slovobor backend service
+After=nginx.service
+
+
+[Install]
+WantedBy=default.target
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+RuntimeMaxSec=86400
+TimeoutStopSec=1
+
+User=slovobor.tktk.in
+Group=nogroup
+
+WorkingDirectory=/home/slovobor.tktk.in/
+
+PIDFile=/home/slovobor.tktk.in/_slvbr.back.pid
+
+EnvironmentFile=/home/slovobor.tktk.in/_config.env
+
+ExecStart=/home/slovobor.tktk.in/slvbr.back -server
+
+StandardOutput=append:/home/slovobor.tktk.in/_logs/stdout.log
+StandardError=append:/home/slovobor.tktk.in/_logs/stderr.log

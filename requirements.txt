@@ -1,7 +1,4 @@
 pip
-PyMySQL
-uWSGI
 requests
-celery
-redis
 ipython
+pyicu

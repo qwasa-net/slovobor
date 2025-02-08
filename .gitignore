@@ -7,15 +7,20 @@ __pycache__
 **/*.sqlite3
 data/*.bz2
 
-#  
+#
 _kakas/
 _env/
 _deploy/
 _logs/
+_go/
+_keys/
 **/*.log
 
 # real API keys (e.g. `_live_keys.ini`)
 keys/_*
+
+data/db
+data/src
 
 # compiled static files ?
 # www/**
