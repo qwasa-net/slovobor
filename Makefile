@@ -6,6 +6,9 @@ MAKEFILE_DIR := $(dir $(MAKEFILE_PATH))
 HOME_PATH := $(MAKEFILE_DIR)
 MENAME ?= $(shell basename "$(MAKEFILE_DIR)")
 
+PYTHON_VENV ?= $(HOME_PATH)/_venv
+PYTHON ?= $(PYTHON_VENV)/bin/python
+
 SSH_KEY ?= _keys/_ssh/slovobor.tktk.in-id_rsa
 SSH_OPTS ?= -p222
 SSH ?= ssh -i $(SSH_KEY) $(SSH_OPTS)
@@ -28,48 +31,19 @@ DEPLOY_ABLES := www deploy data/db Makefile config.template.env _keys/_config.en
 
 help:
 	-@grep -E "^[a-z_0-9]+:" "$(strip $(MAKEFILE_LIST))" | grep '##' | sed 's/:.*##/## —/ig' | column -t -s '##'
+	@echo "  "
+	@echo "> make build_tools_install build_db_ruwiki build_back build_front deploy_remote"
 
 
-deploy_remote: cleanpy deploy_remote_install deploy_remote_files deploy_remote_reload ## (1)+(2)+(3)
+build_tools_install: ## (DEV) install local environment
+	mkdir -pv "$(HOME_PATH)/_logs"
+	# database tools
+	python3 -m venv --clear "$(PYTHON_VENV)"
+	$(PYTHON) -m pip install -U -r requirements.txt
+	# frontend tools
+	npm install npm@^11.1.0
+	./node_modules/.bin/npm install
 
-
-deploy_remote_update: cleanpy deploy_remote_files deploy_remote_reload  ## (2)+(3)
-
-
-deploy_remote_install: SSH_AUTH_KEY := $(shell cat _keys/_ssh/slovobor.tktk.in-id_rsa.pub 2>/dev/null)
-deploy_remote_install: ## (1) create user, install services (sudo)
-	$(SSH) "$(TARGET)" "\
-	sudo useradd -d $(TARGET_PATH) -m -g $(TARGET_USER_GROUP) -s /bin/false $(TARGET_USER) || true; \
-	sudo mkdir -p '$(TARGET_PATH)/.ssh/'; \
-	sudo echo '$(SSH_AUTH_KEY)' > '$(TARGET_PATH)/.ssh/authorized_keys'; \
-	sudo mkdir -pv '$(TARGET_PATH)/_logs' '$(TARGET_PATH)/db'; \
-	sudo touch '$(TARGET_PATH)/_config.env'; \
-	sudo ln -sf $(TARGET_PATH)/deploy/slovobor.service /etc/systemd/system/;\
-	sudo ln -sf $(TARGET_PATH)/deploy/nginx.conf /etc/nginx/sites-enabled/slovobor.conf;\
-	sudo ln -sf $(TARGET_PATH)/deploy/logrotate.conf /etc/logrotate.d/slovobor.conf;\
-	sudo chown -R $(TARGET_USER):$(TARGET_USER_GROUP) $(TARGET_PATH); \
-	sudo chmod -R 750 $(TARGET_PATH); \
-	"
-
-deploy_remote_files: ## (2) copy updated files to TARGET (with rsync)
-	rsync -e "$(SSH)" \
-	--chown $(TARGET_USER):$(TARGET_USER_GROUP) \
-	--ignore-missing-args \
-	--recursive \
-	--verbose \
-	--delete \
-	--exclude=__pycache__ \
-	--exclude=*.bz2 \
-	$(DEPLOY_ABLES) \
-	"$(TARGET):$(TARGET_PATH)"
-
-
-deploy_remote_reload: ## (3) reload services on TARGET
-	$(SSH) "$(TARGET)" "\
-	sudo systemctl reload nginx; \
-	sudo systemctl daemon-reload; \
-	sudo systemctl restart slovobor; \
-	"
 
 build_db_ruwiki: DB_LANG ?= ru
 build_db_ruwiki: DB_SRC_PATH ?= $(HOME_PATH)/data/src/$(WIKIFILENAME)
@@ -82,15 +56,15 @@ build_db_ruwiki: ## (0) build database files
 	test -f "$(DB_SRC_PATH)" || exit 1 # wiki file not found
 
 	# wiki XML → JSON
-	$(HOME_PATH)/_env/bin/python \
+	$(PYTHON) \
 		slovobor/tools/dbbuilder/parse_ruwiktionary_to_json.py \
 		--lang $(DB_LANG) \
 		"$(DB_SRC_PATH)" \
 		"$(DB_PARSED_PATH)"
-	bzip2 "$(DB_PARSED_PATH)"
+	bzip2 --verbose --force "$(DB_PARSED_PATH)"
 
 	# JSON → DB
-	$(HOME_PATH)/_env/bin/python \
+	$(PYTHON) \
 		slovobor/tools/dbbuilder/dbcompiler.py \
 		--min-length 2 \
 		--tags-language $(DB_LANG) \
@@ -108,12 +82,12 @@ build_back: ## (0) build backend
 
 
 build_back_image: ## (X) build backend docker image
-	cd "$(HOME_PATH)/slovobor/slvbr" &&\
+	cd "$(HOME_PATH)/slovobor/back/" &&\
 	DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain \
 	docker build \
-	-f "$(HOME_PATH)/slovobor/slvbr/dockerfile" \
+	-f "$(HOME_PATH)/slovobor/back/dockerfile" \
 	-t slvbr \
-	"$(HOME_PATH)/slovobor/slvbr"
+	"$(HOME_PATH)/slovobor/back/"
 
 
 build_front: ## (0) build web page (frontend)
@@ -121,17 +95,52 @@ build_front: ## (0) build web page (frontend)
 	YANDEX_METRIKA_ID=$(YANDEX_METRIKA_ID) \
 	GOOGLE_TRACKING_ID="'$(GOOGLE_TRACKING_ID)'" \
 	NODE_ENV=production \
-	./node_modules/.bin/webpack
+	./node_modules/.bin/npx webpack --config webpack.config.js
 
 
-run_static_web:  ## (DEV) run local test server for frontend
-	cd "$(HOME_PATH)/www" && python3 -m http.server
+deploy_remote: cleanpy deploy_remote_install deploy_remote_files deploy_remote_reload ## (1)+(2)+(3)
 
 
-local_env_install: back_env_install front_env_install  ## (DEV) install local environment
-	mkdir -pv "$(HOME_PATH)/_logs"
-	python3 -m venv --clear "$(HOME_PATH)/_env"
-	"$(HOME_PATH)/_env/bin/pip3" install -U -r requirements.txt
+deploy_remote_update: cleanpy deploy_remote_files deploy_remote_reload  ## (2)+(3)
+
+
+deploy_remote_install: SSH_AUTH_KEY := $(shell cat _keys/_ssh/slovobor.tktk.in-id_rsa.pub 2>/dev/null)
+deploy_remote_install: ## (1) create user, install services (sudo)
+	$(SSH) "$(TARGET)" "\
+	sudo useradd -d $(TARGET_PATH) -m -g $(TARGET_USER_GROUP) -s /bin/false $(TARGET_USER); \
+	sudo mkdir -pv '$(TARGET_PATH)/.ssh/'; \
+	sudo echo '$(SSH_AUTH_KEY)' > '$(TARGET_PATH)/.ssh/authorized_keys'; \
+	sudo mkdir -pv '$(TARGET_PATH)/_logs' '$(TARGET_PATH)/db'; \
+	sudo touch '$(TARGET_PATH)/_config.env'; \
+	sudo ln -sfv $(TARGET_PATH)/deploy/slovobor.service /etc/systemd/system/;\
+	sudo ln -sfv $(TARGET_PATH)/deploy/nginx.conf /etc/nginx/sites-enabled/slovobor.conf;\
+	sudo ln -sfv $(TARGET_PATH)/deploy/logrotate.conf /etc/logrotate.d/slovobor.conf;\
+	sudo chown -Rc $(TARGET_USER):$(TARGET_USER_GROUP) $(TARGET_PATH); \
+	sudo chmod -Rc 750 $(TARGET_PATH); \
+	"
+
+
+deploy_remote_files: ## (2) copy updated files to TARGET (rsync)
+	rsync -e "$(SSH)" \
+	--chown $(TARGET_USER):$(TARGET_USER_GROUP) \
+	--ignore-missing-args \
+	--recursive \
+	--verbose \
+	--delete \
+	--exclude=__pycache__ \
+	--exclude=*.bz2 \
+	$(DEPLOY_ABLES) \
+	"$(TARGET):$(TARGET_PATH)"
+
+
+deploy_remote_reload: ## (3) reload services on TARGET (sudo)
+	$(SSH) "$(TARGET)" "\
+	sudo chown -Rc $(TARGET_USER):$(TARGET_USER_GROUP) $(TARGET_PATH); \
+	sudo chmod -Rc 750 $(TARGET_PATH); \
+	sudo systemctl reload nginx; \
+	sudo systemctl daemon-reload; \
+	sudo systemctl restart slovobor; \
+	"
 
 
 cleanpy:
