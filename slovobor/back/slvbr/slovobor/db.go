@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"strings"
 
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/transform"
@@ -78,7 +77,7 @@ func (db *DB) Show() {
 	log.Printf("lines: %d\n", db.Meta.LinesCount)
 	for i := uint(0); i < 10; i++ {
 		ii := uint(db.Meta.LinesCount)/3 + i
-		fits, body, txt := db.GetRecordValues(ii)
+		fits, body, txt := db.GetLineValues(ii)
 		fmt.Printf("[%3d] %x %x %s\n", ii, fits, body, txt)
 	}
 	pages, lines := db.CountTOC()
@@ -99,7 +98,7 @@ func (db *DB) GetRecord(recNo int) []byte {
 	return db.LinesIndex[start:end]
 }
 
-func (db *DB) GetRecordValues(recNo uint) ([]byte, []byte, string) {
+func (db *DB) GetLineValues(recNo uint) ([]byte, []byte, string) {
 	if recNo >= uint(db.Meta.LinesCount) {
 		return nil, nil, ""
 	}
@@ -121,7 +120,7 @@ func (db *DB) GetRecordValues(recNo uint) ([]byte, []byte, string) {
 	return fitters, body, txt
 }
 
-func (db *DB) GetRecordText(recNo uint) string {
+func (db *DB) GetLineText(recNo uint) string {
 	if recNo >= uint(db.Meta.LinesCount) {
 		return ""
 	}
@@ -137,7 +136,7 @@ func (db *DB) GetRecordText(recNo uint) string {
 	return txt
 }
 
-func (db *DB) QueryRecordFit(query []byte, start uint, len uint) (int, uint) {
+func (db *DB) FindLineFit(query []byte, start uint, len uint) (int, uint) {
 	var stop uint
 	if len == 0 {
 		stop = uint(db.Meta.LinesCount)
@@ -162,7 +161,7 @@ func (db *DB) QueryRecordFit(query []byte, start uint, len uint) (int, uint) {
 	return 0, 0
 }
 
-func (db *DB) QueryRecordFitAll(query []byte, start uint, length uint, limit int) (int, []uint) {
+func (db *DB) FindAllLinesFit(query []byte, start uint, length uint, limit int) (int, []uint) {
 	var found = make([]uint, 0, 1000)
 	var stop uint
 	if length == 0 {
@@ -191,150 +190,5 @@ func (db *DB) QueryRecordFitAll(query []byte, start uint, length uint, limit int
 	return len(found), found
 }
 
-func (db *DB) CountTOC() (uint, uint) {
-	var pages uint = 0
-	var records uint = 0
-	for i := uint(0); i < uint(db.Meta.TOCCount); i++ {
-		tocOff := i * uint(db.Meta.TOCLen)
-		tocFitLen := uint(db.Meta.TagLen) * uint(db.Meta.TagsCount)
-		count := uint(binary.LittleEndian.Uint32(db.Toc[tocOff+tocFitLen+4 : tocOff+tocFitLen+8]))
-		records += count
-		pages += 1
-	}
-	return pages, records
-}
-
-func queryFits(query []byte, fits []byte, fitters []Tag, len int) (bool, int, int) {
-	c := 0
-	for j := int(0); j < int(len); j++ {
-		c += 1
-		if fitters[j].Type == 0 {
-			if query[j] < fits[j] {
-				return false, j, c
-			}
-		}
-	}
-	return true, -1, c
-}
-
-func (db *DB) QueryTocFit(query []byte, recNo uint, pageNo uint) (int, uint, uint) {
-	tocFitLen := uint(db.Meta.TagLen * db.Meta.TagsCount)
-	skipPageFit := pageNo > 0 || recNo > 0
-	for i := uint(pageNo); i < uint(db.Meta.TOCCount); i++ {
-		tocOff := uint(i) * uint(db.Meta.TOCLen)
-
-		if !skipPageFit {
-			pageFits := true
-			for j := uint(0); j < tocFitLen; j++ {
-				if db.Tags[j].Type == 0 {
-					if query[j] < db.Toc[tocOff+j] {
-						pageFits = false
-						break
-					}
-				}
-			}
-
-			if !pageFits {
-				continue
-			}
-		}
-
-		tocNo := uint(binary.LittleEndian.Uint32(db.Toc[tocOff+tocFitLen : tocOff+tocFitLen+4]))
-		count := uint(binary.LittleEndian.Uint32(db.Toc[tocOff+tocFitLen+4 : tocOff+tocFitLen+8]))
-		scanCount := min(count, count-(recNo-tocNo))
-		if scanCount <= 0 {
-			continue
-		}
-		scanStart := max(tocNo, recNo)
-
-		found, lineNo := db.QueryRecordFit(query, scanStart, scanCount)
-		if found > 0 {
-			return found, lineNo, i
-		}
-	}
-	return 0, 0, 0
-
-}
-
-func (db *DB) QueryTocFitAll(query []byte, pageNo uint, limit int) (int, []uint) {
-
-	var tocRecs []uint = make([]uint, 0, 1000)
-
-	for i := uint(pageNo); i < uint(db.Meta.TOCCount); i++ {
-
-		tocOff := uint(i) * uint(db.Meta.TOCLen)
-		tocFitLen := uint(db.Meta.TagLen * db.Meta.TagsCount)
-
-		pageFits := true
-
-		for j := uint(0); j < tocFitLen; j++ {
-			if db.Tags[j].Type == 0 {
-				if query[j] < db.Toc[tocOff+j] {
-					pageFits = false
-					break
-				}
-			}
-		}
-		if !pageFits {
-			continue
-		}
-
-		recNo := uint(binary.LittleEndian.Uint32(db.Toc[tocOff+tocFitLen : tocOff+tocFitLen+4]))
-		count := uint(binary.LittleEndian.Uint32(db.Toc[tocOff+tocFitLen+4 : tocOff+tocFitLen+8]))
-
-		found, pageRecs := db.QueryRecordFitAll(query, recNo, count, limit)
-		if found > 0 {
-			tocRecs = append(tocRecs, pageRecs...)
-		}
-		if limit > 0 && len(tocRecs) >= limit {
-			break
-		}
-	}
-	return len(tocRecs), tocRecs
-}
-
 func (db *DB) PostInit() {
-}
-
-type TagsOpts struct {
-	OnlyNoun     bool
-	NoTopo       bool
-	NoNomen      bool
-	NotOffensive bool
-	MinLength    int
-}
-
-func (db *DB) StringToTagLine(q string, opts ...TagsOpts) ([]byte, int) {
-	var query []byte
-	var total int = 0
-	q = strings.ToLower(q)
-	for i := 0; i < len(db.Tags); i++ {
-		if db.Tags[i].Type == 0 {
-			v := db.Tags[i].Value
-			count := 0
-			for _, c := range q {
-				if string(c) == v {
-					count += 1
-				}
-			}
-			query = append(query, byte(count))
-			total += count
-		} else {
-			query = append(query, 0)
-		}
-	}
-
-	// magic tagging
-	if len(opts) > 0 {
-		if opts[0].MinLength > 0 {
-			query[len(query)-4] = byte(opts[0].MinLength) // length
-		}
-		if opts[0].OnlyNoun {
-			query[len(query)-3] = 78 // morph=N|V|A
-			query[len(query)-2] = 2  // topo=false
-			query[len(query)-1] = 2  // nomen=false
-		}
-	}
-
-	return query, total
 }

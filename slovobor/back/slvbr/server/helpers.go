@@ -64,8 +64,9 @@ type TGPostMessage struct {
 
 func queryDB(db *slovobor.DB, q string, opts slovobor.TagsOpts, limit int) []string {
 
-	var foundCount int = 0
-	var foundAll []uint
+	var linesCount int = 0
+	var lineIDs []uint
+	var cached bool = false
 
 	tagLine, tagged := db.StringToTagLine(q, opts)
 	if tagged == 0 {
@@ -73,31 +74,31 @@ func queryDB(db *slovobor.DB, q string, opts slovobor.TagsOpts, limit int) []str
 	}
 
 	tm_a := time.Now()
-	foundCount, foundAll = db.QueryTocFitAll(tagLine, 0, limit)
+	linesCount, lineIDs, cached = db.FindAllLinesByTocFitCached(tagLine, 0, limit)
 	tm_b := time.Now()
 
-	words := make([]string, 0, foundCount)
-	for _, lineNo := range foundAll {
-		word := db.GetRecordText(uint(lineNo))
+	words := make([]string, 0, linesCount)
+	for _, lineNo := range lineIDs {
+		word := db.GetLineText(uint(lineNo))
 		words = append(words, word)
 	}
 
-	log.Println("QueryRecordFitAll:", foundCount, tm_b.Sub(tm_a))
+	log.Printf("queryDB: count=%d; cached=%t; ts=%s", linesCount, cached, tm_b.Sub(tm_a))
 
 	return words
 
 }
 
-func sendTGMessage(token string, tgrsp *TGPostMessage) {
+func sendTGMessage(token string, tgmsg *TGPostMessage) {
 	url := fmt.Sprintf(TG_API_URL, token)
-	payload, _ := json.Marshal(tgrsp)
+	payload, _ := json.Marshal(tgmsg)
 	mime := "application/json"
 	rsp, err := http.Post(url, mime, bytes.NewReader(payload))
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	log.Printf("sendTGMessage: {%x} [%s]\n", len(payload), rsp.Status)
+	log.Printf("sendTGMessage: chatID=%d len=%x [%s]\n", tgmsg.ChatID, len(payload), rsp.Status)
 	if rsp.StatusCode != http.StatusOK {
 		defer rsp.Body.Close()
 		body, _ := io.ReadAll(rsp.Body)

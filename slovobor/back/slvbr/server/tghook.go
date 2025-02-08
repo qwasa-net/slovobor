@@ -141,7 +141,12 @@ func (s *Server) processTGHookQueryBG(msg *TGHookMessage, query string) {
 		Count: len(words),
 		Words: strings.Join(words, ", "),
 	}
-	log.Println(data)
+	log.Printf(
+		"processTGHookQueryBG: query=%s count=%d words=%.255s\n",
+		query,
+		len(words),
+		data.Words,
+	)
 	s.postTGResponse(msg, data)
 }
 

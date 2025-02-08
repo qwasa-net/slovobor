@@ -31,15 +31,15 @@ func main() {
 	}
 
 	if cfg.Query != "" {
-		doQuery(dbs, cfg)
+		doQuery(dbs, &cfg)
 	}
 
 	if cfg.Demo {
-		doDemo(dbs, cfg)
+		doDemo(dbs, &cfg)
 	}
 
 	if cfg.Server {
-		runServer(dbs, cfg)
+		runServer(dbs, &cfg)
 	}
 
 }
@@ -59,13 +59,13 @@ func loadDataBase(dbPath string) *slovobor.DB {
 	return db
 }
 
-func doDemo(dbs []slovobor.DB, cfg Config) {
+func doDemo(dbs []slovobor.DB, cfg *Config) {
 	for _, db := range dbs {
 		doDemoDB(&db)
 	}
 }
 
-func runServer(dbs []slovobor.DB, cfg Config) {
+func runServer(dbs []slovobor.DB, cfg *Config) {
 	s := server.Server{
 		Dbs:    dbs,
 		Config: cfg.ServerConfig,
@@ -73,17 +73,16 @@ func runServer(dbs []slovobor.DB, cfg Config) {
 	s.Run()
 }
 
-func doQuery(dbs []slovobor.DB, cfg Config) {
+func doQuery(dbs []slovobor.DB, cfg *Config) {
 	for _, db := range dbs {
 		queryLine, _ := db.StringToTagLine(cfg.Query)
-		log.Println("=== QueryRecordFitAll", time.Now())
+		log.Println("=== FindAllRecordsByTocFit", time.Now())
 		startTm := time.Now()
-		foundCount, foundAll := db.QueryTocFitAll(queryLine, 0, 0)
+		foundCount, ids := db.FindAllLinesByTocFit(queryLine, 0, 0)
 		endTm := time.Now()
-		log.Printf("QueryRecordFitAll found %d results in %v\n", foundCount, endTm.Sub(startTm))
-
-		for i := 0; i < foundCount; i++ {
-			txt := db.GetRecordText(foundAll[i])
+		log.Printf("FindAllRecordsByTocFit found %d results in %v\n", foundCount, endTm.Sub(startTm))
+		for _, id := range ids {
+			txt := db.GetLineText(id)
 			fmt.Print(txt, " ")
 		}
 		fmt.Println()
