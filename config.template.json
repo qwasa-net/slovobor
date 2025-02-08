@@ -1,9 +1,0 @@
-{
-    "DB_UNIX": "/var/run/mysqld/mysqld.sock",
-    "DB_HOST": null,
-    "DB_NAME": "slovobor",
-    "DB_USER": "slovobor",
-    "DB_PASS": "",
-    "TELEGRAM_BOT_TOKEN": "00000000:AAAAAAAAAAAAAAAAAAAA",
-    "TELEGRAM_WEBHOOK_TOKEN": "webhook-secret-url"
-}
