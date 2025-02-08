@@ -34,7 +34,7 @@ const slovobor = {
     MAX_LENGTH: 40,
     MIN_LENGTH: 4,
 
-    init: function() {
+    init: function () {
         if (typeof WEB_API_URL !== "undefined" && WEB_API_URL) {
             this.API_URL = WEB_API_URL;
         }
@@ -44,6 +44,7 @@ const slovobor = {
         this.status = document.getElementById("sl_status");
         if (this.form && this.input && this.output && this.status && this.state == "init") {
             this.form.onsubmit = (ev) => { this.post_word(ev); return false; };
+            this.form.onreset = (ev) => { this.input.value = ""; this.input.focus(); return false; };
             this.clear_output();
             this.input.focus();
             this.state = "init";
@@ -58,13 +59,13 @@ const slovobor = {
         }
     },
 
-    random_word: function() {
+    random_word: function () {
         this.state = "ready";
         this.input.value = this.RAMDOM_WORDS[Math.floor(Math.random() * this.RAMDOM_WORDS.length)];
         this.post_word();
     },
 
-    post_word: function() {
+    post_word: function () {
 
         if (this.state !== "ready" ||
             this.input.value.length < this.MIN_LENGTH) {
@@ -85,6 +86,7 @@ const slovobor = {
 
         let req = {
             "method": "post",
+            "headers": { "Content-Type": "application/x-www-form-urlencoded" },
             "body": "q=" + this.word + "&o=" + offensive + "&n=" + nouns
         };
 
@@ -104,7 +106,7 @@ const slovobor = {
 
     },
 
-    read_words: function(data) {
+    read_words: function (data) {
 
         if (!data || !data.q) {
             this.oops();
@@ -134,20 +136,20 @@ const slovobor = {
 
     },
 
-    oops: function() {
+    oops: function () {
         this.state = "error";
         this.status.textContent = this.STATUS_MESSAGES[this.state];
         clearTimeout(this.tm);
         this.tm = setTimeout(() => { this.init(); }, 9999);
     },
 
-    clear_output: function() {
+    clear_output: function () {
         while (this.output.firstChild) {
             this.output.removeChild(this.output.firstChild);
         }
     },
 
-    _words_cmp: function(a, b) {
+    _words_cmp: function (a, b) {
         if (a.length == b.length)
             return a.localeCompare(b); // (a > b);
         else if (a.length > b.length)
