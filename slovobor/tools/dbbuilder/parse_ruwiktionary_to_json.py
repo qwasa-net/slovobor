@@ -32,16 +32,21 @@ def int0(s):
 spsymbs_re = re.compile(r"[:/\[\]\s]")
 
 wklinks_re = re.compile(r"\[\[([a-zA-Zа-яА-Я]{4,})\]\]")
+
 MORPH_RE = re.compile(
-    r"===\s*Морфологические и синтаксические свойства\s*===(.*?)(===|$)",
+    r"===\s*Морфологические и синтаксические свойства\s*===(.*?)(\n=|$)",
     re.I | re.DOTALL,
 )
 ANTONYMS_RE = re.compile(
-    r"====\s*Антонимы\s*====(.*?)(====|$)",
+    r"====\s*Антонимы\s*====[\s\n\r]+(.*?)(\n=|$)",
     re.I | re.DOTALL,
 )
 SYNONYMS_RE = re.compile(
-    r"====\s*Синонимы\s*====(.*?)(====|$)",
+    r"====\s*Синонимы\s*====[\s\n\r]+(.*?)(\n=|$)",
+    re.I | re.DOTALL,
+)
+MEANING_RE = re.compile(
+    r"====\s*Значение\s*====[\s\n\r]+(.*?)(\n=|$)",
     re.I | re.DOTALL,
 )
 
@@ -56,6 +61,7 @@ class WikiReader(xml.sax.handler.ContentHandler):
         self.texts = {}
         self.output = []
         self.lang = kwargs.get("lang", "ru")
+        self.uniques = set()
 
     def startElement(self, name, attrs):
         self.level += 1
@@ -70,9 +76,14 @@ class WikiReader(xml.sax.handler.ContentHandler):
             self.pages += 1
             data = self.process_page()
             if data:
+                if data["word"] in self.uniques:
+                    print(f"#! DUP: {data['word']}", file=sys.stderr)
+                self.uniques.add(data["word"])
+                # if data["offensive"]:
+                #     print(f"!OFF: {data['word']} {data['syns']}", file=sys.stderr)
+                if len(self.output) % 1000 == 1:
+                    print(f"#~ {len(self.output)}/{self.pages}: {data}", file=sys.stderr)
                 self.output.append(data)
-                if len(data["morph"]) > 1 or len(self.output) % 100 == 0:
-                    print(f"{len(self.output)}/{self.pages}, {data}", file=sys.stderr)
             self.texts = {}
 
         elif self.levels:
@@ -93,7 +104,8 @@ class WikiReader(xml.sax.handler.ContentHandler):
 class RUWikiReader(WikiReader):
     """ """
 
-    PAGE_LANG_BLOCK_SPLIT_RE = re.compile(r"= {{-([a-z]+)-}} =", re.I | re.DOTALL)
+    # {{-ru-}} -- начало блока для языка
+    PAGE_LANG_BLOCK_SPLIT_RE = re.compile(r"^=\s+{{-([a-z]+)-}}\s+=$", re.I | re.M)
 
     def get_lang_block(self, text, lang):
         start, end = 0, len(text)
@@ -121,61 +133,91 @@ class RUWikiReader(WikiReader):
         if not text:
             return None
 
-        # True or None (certain or uncertain, because not detected)
-        offensive = (text.find("""{{offensive}}""") >= 0) or None
-
         # === Морфо
         morph, topo, nomen = "", None, None
 
-        for mo in MORPH_RE.finditer(text):
-            txt_morph = mo.group(1)
+        for mo in MORPH_RE.finditer(text):  # слово одно -- смыслов несколько
+            mrph_txt = mo.group(1)
             if (
-                txt_morph.find("\n{{сущ " + self.lang) >= 0
-                or txt_morph.find("\n{{сущ-" + self.lang) >= 0
+                re.search(r"\n{{\s*сущ[\- ]+" + self.lang, mrph_txt, re.I | re.M)
+                or re.search(r"\n{{\s*падежи\s*\n", mrph_txt, re.I | re.M)
+                or False
             ):
                 morph += "N"
-            if txt_morph.find("\n{{гл " + self.lang) >= 0:
+            if re.search(r"\n{{\s*гл[\- ]+" + self.lang, mrph_txt, re.I | re.M):
                 morph += "V"
-            if txt_morph.find("\n{{прил " + self.lang) >= 0:
+            if (
+                re.search(r"\n{{\s*прил[\- ]+" + self.lang, mrph_txt, re.I | re.M)
+                or re.search(r"\n{{\s*Мс-п6", mrph_txt, re.I | re.M)
+                or False
+            ):
                 morph += "A"
-            if txt_morph.find("\n{{adv" + self.lang) >= 0:
-                morph += "D"
-            if txt_morph.find("\n{{числ " + self.lang) >= 0:
+            if re.search(r"\n{{\s*числ[\- ]+", mrph_txt, re.I | re.M):
                 morph += "9"
-            if txt_morph.find("\n{{прич " + self.lang) >= 0:
+            if re.search(r"\n{{\s*adv[\- ]+" + self.lang, mrph_txt, re.I | re.M):
+                morph += "D"
+            if re.search(
+                r"\n{{\s*(adv|predic|conj)[\- ]+" + self.lang, mrph_txt, re.I | re.M
+            ):
+                morph += "R"
+            if re.search(r"\n{{\s*(прич|деепр)[\- ]+", mrph_txt, re.I | re.M):
                 morph += "P"
-            if txt_morph.find("\n{{мест " + self.lang) >= 0:
+            if re.search(r"\n{{\s*мест[\- ]+", mrph_txt, re.I | re.M):
                 morph += "Z"
-            if txt_morph.find("\n{{abbrev") >= 0:
+            if re.search(r"\n{{\s*prep[\- ]+", mrph_txt, re.I | re.M):
+                morph += "S"
+            if re.search(r"\n{{\s*(intro|part)[\- ]+", mrph_txt, re.I | re.M):
+                morph += "T"
+            if re.search(r"\n{{\s*abbrev", mrph_txt, re.I | re.M):
                 morph += "B"
-
-            topo = txt_morph.find("{{топоним") >= 0 or txt_morph.find("{{гидроним") >= 0
+            if re.search(r"\n{{\s*Фам[\- ]+", mrph_txt, re.M):
+                morph += "F"
+            if re.search(r"\n{{\s*interj[\- ]+", mrph_txt, re.I | re.M):
+                morph += "J"
+            if re.search(r"\n{{\s*onomatop[\- ]+", mrph_txt, re.I | re.M):
+                morph += "O"
+            topo = mrph_txt.find("{{топоним") >= 0 or mrph_txt.find("{{гидроним") >= 0
             nomen = (
-                txt_morph.find("{{собств.") >= 0
+                mrph_txt.find("{{собств.") >= 0
                 or "B" not in morph
                 and title[0].isupper()
             )
 
         # неизвестная фигня
-        if not morph:
+        if not morph or morph == "F":
+            if (
+                not morph
+                and len(title) > 2
+                and not title[0].isupper()
+                and "-" not in title
+                and "." not in title
+            ):
+                print(f"#! MORPH: {title} {self.lang}", file=sys.stderr)
             return None
 
-        ants = []
-        for mo in ANTONYMS_RE.finditer(text):
-            # [[отмель]], [[мель]]; {{помета|частичн.}}, {{разг.|-}}: [[мелкота]]
-            for w in wklinks_re.findall(mo.group(1)):
-                ants.append(w)
+        offensive = None
+        mean_mo = MEANING_RE.search(text)
+        if mean_mo:
+            mean_text = mean_mo.group(1)
+            mean_first = mean_text.split("\n")[0]
+            if mean_first.find("{{обсц.") >= 0 or mean_first.find("{{вульг.") >= 0:
+                # print(f"#MEAN: {mean_first}", file=sys.stderr)
+                offensive = True
 
-        syns = []
-        for mo in SYNONYMS_RE.finditer(text):
-            # [[отмель]], [[мель]]; {{помета|частичн.}}, {{разг.|-}}: [[мелкота]]
+        ants = set()
+        for mo in ANTONYMS_RE.finditer(text):  # антонимы к каждому смыслу
             for w in wklinks_re.findall(mo.group(1)):
-                syns.append(w)
+                ants.add(w)
+
+        syns = set()
+        for mo in SYNONYMS_RE.finditer(text):  # синонимы к каждому смыслу
+            for w in wklinks_re.findall(mo.group(1)):
+                syns.add(w)
 
         page = {
             "word": title,
-            "syns": syns,
-            "ants": ants,
+            "syns": list(syns),
+            "ants": list(ants),
             "morph": "".join(sorted(set(morph))),
             "topo": topo,
             "nomen": nomen,
@@ -196,64 +238,7 @@ class ENWikiReader(WikiReader):
         super().__init__(**kwargs)
 
     def process_page(self):
-
-        title = sstrip("".join(self.texts.get("title", [])))
-        text = "".join(self.texts.get("text", []))
-
-        if spsymbs_re.search(title):
-            return None
-
-        if text.find("""==English==""") < 0:
-            return None
-
-        enmo = self.ENGLISH_RE.search(text)
-        if not enmo:
-            return None
-
-        text = enmo.group(1)
-
-        # True or None (certain or uncertain, because not detected)
-        offensive = (text.find("""{{offensive}}""") >= 0) or None
-
-        morph = ""
-
-        if re.search(r"^===Noun===\n{{en-noun", text, re.M | re.I):
-            morph += "N"
-        if re.search(r"^===Verb===\n{{en-verb", text, re.M | re.I):
-            morph += "V"
-        if re.search(r"^===Adjective===\n{{en-adj", text, re.M | re.I):
-            morph += "A"
-        if re.search(r"^===Adverb===\n{{en-", text, re.M | re.I):
-            morph += "D"
-        if re.search(r"^===Numeral===\n{{en-", text, re.M | re.I):
-            morph += "9"
-        if re.search(r"^===Pronoun===\n{{en-", text, re.M | re.I):
-            morph += "P"
-        if re.search(r"^===Proper noun===\n{{en-", text, re.M | re.I):
-            morph += "Z"
-        if re.search(r"^===Abbreviation===\n{{en-", text, re.M | re.I):
-            morph += "B"
-
-        topo = None  # FIXME
-        nomen = None  # FIXME
-        ants = []  # FIXME
-        syns = []
-        for mo in SYNONYMS_RE.finditer(text):
-            # [[отмель]], [[мель]]; {{помета|частичн.}}, {{разг.|-}}: [[мелкота]]
-            for w in wklinks_re.findall(mo.group(1)):
-                syns.append(w)
-
-        if morph:
-            page = {
-                "word": title,
-                "syns": syns,
-                "ants": ants,
-                "morph": morph,
-                "topo": topo,
-                "nomen": nomen,
-                "offensive": offensive,
-            }
-            return page
+        return {}
 
 
 def save_output(fn="data.json", output=None):

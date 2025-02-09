@@ -333,9 +333,11 @@ def main():
 
     # count ranking and sort for best tag
     print("counting ranking …")
-    words = count_ranking(words, letters)
+    words = count_ranking(words, args.tags)
     words = sorted(words, key=lambda w: w["__ranking"], reverse=False)
+    print(f"{words[1]=}")
     print(f"{words[1000]=}")
+    print(f"{words[-1]=}")
     show_boxes(words, args)
 
     # compile db
@@ -364,6 +366,16 @@ def compile_db(words, args):
             )
             for c in args.tags
         ]
+        if sum([t[1] for t in tags]) == 0:
+            print(f"skipping empty tags set: {i=} {word['word']=}")
+            continue
+        tags.append(
+            (
+                "~".encode(args.encoding, errors="ignore"),
+                1 if word["offensive"] else 2,
+                3,
+            )
+        )
         tags.append(
             (
                 "~".encode(args.encoding, errors="ignore"),

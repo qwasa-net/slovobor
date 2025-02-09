@@ -29,57 +29,96 @@ DEPLOY_ABLES := www deploy data/db Makefile config.template.env _keys/_config.en
 
 .PHONY: help
 
+##
 help:
 	-@grep -E "^[a-z_0-9]+:" "$(strip $(MAKEFILE_LIST))" | grep '##' | sed 's/:.*##/## —/ig' | column -t -s '##'
 	@echo "  "
 	@echo "> make build_tools_install build_db_ruwiki build_back build_front deploy_remote"
 
-
-build_tools_install: ## (DEV) install local environment
+##
+dev_tools_install: ## (DEV) install local environment
 	mkdir -pv "$(HOME_PATH)/_logs"
 	# database tools
-	python3 -m venv --clear "$(PYTHON_VENV)"
+	$(PYTHON) --version || python3 -m venv --clear "$(PYTHON_VENV)"
 	$(PYTHON) -m pip install -U -r requirements.txt
 	# frontend tools
 	npm install npm@^11.1.0
 	./node_modules/.bin/npm install
 
-
+##
 build_db_ruwiki: DB_LANG ?= ru
 build_db_ruwiki: DB_SRC_PATH ?= $(HOME_PATH)/data/src/$(WIKIFILENAME)
 build_db_ruwiki: DB_PARSED_PATH ?= $(HOME_PATH)/data/src/$(DB_LANG)-parsed.json
 build_db_ruwiki: DB_COMPILED_PATH ?= $(HOME_PATH)/data/db/$(DB_LANG).slvbr.db
-build_db_ruwiki: ## (0) build database files
+build_db_ruwiki: build_db_ruwiki_download build_db_ruwiki_parse build_db_compile ## (0) build database files RU
 
+build_db_ruwiki_download:
 	# download wiki XML
 	-@echo wget $(WIKIURL) -c -O "$(DB_SRC_PATH)"
 	test -f "$(DB_SRC_PATH)" || exit 1 # wiki file not found
 
-	# wiki XML → JSON
-	$(PYTHON) \
+build_db_ruwiki_parse:
+	# # wiki XML → JSON
+	-ls -lh "$(DB_PARSED_PATH).bz2"
+
+	test -f "$(DB_PARSED_PATH).bz2" || \
+	($(PYTHON) -u \
 		slovobor/tools/dbbuilder/parse_ruwiktionary_to_json.py \
 		--lang $(DB_LANG) \
 		"$(DB_SRC_PATH)" \
-		"$(DB_PARSED_PATH)"
-	bzip2 --verbose --force "$(DB_PARSED_PATH)"
+		"$(DB_PARSED_PATH)" \
+		2>&1 | tee "$(DB_PARSED_PATH).log" \
+	&& bzip2 --verbose --force "$(DB_PARSED_PATH)" )
 
-	# JSON → DB
-	$(PYTHON) \
+
+##
+build_db_en_wordnet: DB_LANG ?= en
+build_db_en_wordnet: DB_SRC_PATH ?= $(HOME_PATH)/data/src/wordnet/
+build_db_en_wordnet: DB_PARSED_PATH ?= $(HOME_PATH)/data/src/$(DB_LANG)-parsed.json
+build_db_en_wordnet: DB_COMPILED_PATH ?= $(HOME_PATH)/data/db/$(DB_LANG).slvbr.db
+build_db_en_wordnet: build_db_wordnet_download build_db_wordent_parse build_db_compile ## (0) build database files EN
+
+build_db_wordnet_download:
+	# download wordnet
+	-@echo wget https://wordnet.princeton.edu/download/current-version -O "$(DB_SRC_PATH)"
+	-@echo "gunzip -c $(DB_SRC_PATH) | tar -xvf - -C $(HOME_PATH)/data/src/wordnet"
+	test -d "$(DB_SRC_PATH)" || exit 1 # wordnet file not found
+
+build_db_wordent_parse:
+	# # wiki XML → JSON
+	-ls -lh "$(DB_PARSED_PATH).bz2"
+
+	test -f "$(DB_PARSED_PATH).bz2" || \
+	($(PYTHON) -u \
+		slovobor/tools/dbbuilder/parse_wordnet_to_json.py \
+		"$(DB_SRC_PATH)" \
+		"$(DB_PARSED_PATH)" \
+		2>&1 | tee "$(DB_PARSED_PATH).log" \
+	&& bzip2 --verbose --force "$(DB_PARSED_PATH)" )
+
+
+##
+build_db_compile:
+	# # JSON → DB
+	-ls -lh "$(DB_COMPILED_PATH)"
+
+	test -f "$(DB_COMPILED_PATH)" || \
+	$(PYTHON) -u \
 		slovobor/tools/dbbuilder/dbcompiler.py \
 		--min-length 2 \
 		--tags-language $(DB_LANG) \
-		--morph NVA \
+		--morph NVA9 \
 		--encoding cp1251 \
 		--best-tag-order \
-		"$(DB_PARSED_PATH).bz2" "$(DB_COMPILED_PATH)"
+		"$(DB_PARSED_PATH).bz2" "$(DB_COMPILED_PATH)" \
+		2>&1 | tee "$(DB_COMPILED_PATH).log"
 
-
+##
 build_back: ## (0) build backend
 	cd "$(HOME_PATH)/slovobor/back/slvbr" &&\
 	CGO_ENABLED=0 GOOS=linux \
 	go build -v -ldflags="-s -w" -o "$(BACK_EXE_PATH)" .
 	ls -l "$(BACK_EXE_PATH)"
-
 
 build_back_image: ## (X) build backend docker image
 	cd "$(HOME_PATH)/slovobor/back/" &&\
@@ -89,7 +128,7 @@ build_back_image: ## (X) build backend docker image
 	-t slvbr \
 	"$(HOME_PATH)/slovobor/back/"
 
-
+##
 build_front: ## (0) build web page (frontend)
 	env -v \
 	YANDEX_METRIKA_ID=$(YANDEX_METRIKA_ID) \
@@ -97,12 +136,10 @@ build_front: ## (0) build web page (frontend)
 	NODE_ENV=production \
 	./node_modules/.bin/npx webpack --config webpack.config.js
 
-
+##
 deploy_remote: cleanpy deploy_remote_install deploy_remote_files deploy_remote_reload ## (1)+(2)+(3)
 
-
 deploy_remote_update: cleanpy deploy_remote_files deploy_remote_reload  ## (2)+(3)
-
 
 deploy_remote_install: SSH_AUTH_KEY := $(shell cat _keys/_ssh/slovobor.tktk.in-id_rsa.pub 2>/dev/null)
 deploy_remote_install: ## (1) create user, install services (sudo)
@@ -119,7 +156,6 @@ deploy_remote_install: ## (1) create user, install services (sudo)
 	sudo chmod -Rc 750 $(TARGET_PATH); \
 	"
 
-
 deploy_remote_files: ## (2) copy updated files to TARGET (rsync)
 	rsync -e "$(SSH)" \
 	--chown $(TARGET_USER):$(TARGET_USER_GROUP) \
@@ -132,7 +168,6 @@ deploy_remote_files: ## (2) copy updated files to TARGET (rsync)
 	$(DEPLOY_ABLES) \
 	"$(TARGET):$(TARGET_PATH)"
 
-
 deploy_remote_reload: ## (3) reload services on TARGET (sudo)
 	$(SSH) "$(TARGET)" "\
 	sudo chown -Rc $(TARGET_USER):$(TARGET_USER_GROUP) $(TARGET_PATH); \
@@ -142,12 +177,12 @@ deploy_remote_reload: ## (3) reload services on TARGET (sudo)
 	sudo systemctl restart slovobor; \
 	"
 
-
+##
 cleanpy:
 	find $(HOME_PATH) -iname *.pyc -delete
 	find $(HOME_PATH) -iname *.pyo -delete
 
-
+##
 bak:
 	tar cv \
 	--exclude=_kakas \
