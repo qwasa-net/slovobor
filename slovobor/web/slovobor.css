@@ -61,7 +61,8 @@ h3 {
 
 code {
   font-family: "PT Mono", "Monaco", "Consolas", monospace;
-  background-color: #f0f0f0;
+  background-color: #e8e8e8;
+  font-weight: bold;
 }
 
 .nobr {
@@ -137,12 +138,18 @@ section {
 section p {
   line-height: 1.25;
   margin: 0.5em 0 1em 0;
-  max-width: 60em;
+  max-width: 80em;
+}
+
+section p.less {
+  font-size: 85%;
+  max-width: 120em;
+  color: #282828;
 }
 
 section p a {
   padding: 0 0.15em;
-  background-color: #f4f4f0;
+  background-color: #e8e8f0;
 }
 
 /* form */
@@ -193,7 +200,8 @@ section p a {
   /* #feeec4;  */
 }
 
-#big_input input[type='submit'], #big_input input[type='reset'] {
+#big_input input[type='submit'],
+#big_input input[type='reset'] {
   position: absolute;
   margin: 0 0 0 -1.25em;
   text-align: center;
@@ -209,11 +217,13 @@ section p a {
   margin: 0;
 }
 
-#big_input input[type='submit']:hover, #big_input input[type='reset']:hover {
+#big_input input[type='submit']:hover,
+#big_input input[type='reset']:hover {
   color: #b00010;
 }
 
-#big_input input[type='submit']:active, #big_input input[type='reset']:active {
+#big_input input[type='submit']:active,
+#big_input input[type='reset']:active {
   background-color: #f0b80f;
   color: #b00010;
 }
@@ -307,7 +317,6 @@ footer a:visited {
 #tg_link {
   float: right;
   line-height: 1.8;
-  /* match h2 header: line-height×font-size = 1.5×120% */
   margin: 0;
   padding: 0;
   transition: all 0.25s;
@@ -367,7 +376,7 @@ a:hover .tglogo {
   }
 
   #content {
-    padding: 1em 0.1em;
+    padding: 0.8em 0.1em;
   }
 
   section {
@@ -377,6 +386,11 @@ a:hover .tglogo {
 
   section p {
     margin: 0.5em 0;
+    line-height: 1.1;
+  }
+
+  section p.less {
+    font-size: 66%;
   }
 
 }
