@@ -55,7 +55,7 @@ const slovobor = {
             this.status.textContent = this.STATUS_MESSAGES[this.state] || "";
             clearTimeout(this.tm);
             this.tm = setTimeout(() => {
-                this.random_word();
+                this.init_random_word();
                 this.input.focus();
             }, 200);
         } else {
@@ -63,9 +63,15 @@ const slovobor = {
         }
     },
 
-    random_word: function () {
+    init_random_word: function () {
         this.state = "ready";
-        this.input.value = this.RAMDOM_WORDS[Math.floor(Math.random() * this.RAMDOM_WORDS.length)];
+        if (window.location.hash.length > 1) {
+            let hash = window.location.hash.substring(1);
+            this.input.value = decodeURIComponent(hash);
+            window.location.hash = "#";
+        } else {
+            this.input.value = this.RAMDOM_WORDS[Math.floor(Math.random() * this.RAMDOM_WORDS.length)];
+        }
         this.post_word();
     },
 
@@ -81,7 +87,7 @@ const slovobor = {
         this.clear_output();
         this.input.blur();
 
-        this.word = String(this.input.value).substr(0, this.MAX_LENGTH).toLowerCase();
+        this.word = String(this.input.value).substring(0, this.MAX_LENGTH).toLowerCase();
         this.input.value = this.word;
 
         let els = this.form.elements;

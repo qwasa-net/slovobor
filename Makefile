@@ -160,6 +160,7 @@ deploy_remote_files: ## (2) copy updated files to TARGET (rsync)
 	rsync -e "$(SSH)" \
 	--chown $(TARGET_USER):$(TARGET_USER_GROUP) \
 	--ignore-missing-args \
+	--update \
 	--recursive \
 	--verbose \
 	--delete \
