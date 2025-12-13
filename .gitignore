@@ -8,12 +8,7 @@ __pycache__
 data/*.bz2
 
 #
-_kakas/
-_env/
-_deploy/
-_logs/
-_go/
-_keys/
+_*
 **/*.log
 
 # real API keys (e.g. `_live_keys.ini`)

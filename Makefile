@@ -144,14 +144,14 @@ deploy_remote_update: cleanpy deploy_remote_files deploy_remote_reload  ## (2)+(
 deploy_remote_install: SSH_AUTH_KEY := $(shell cat _keys/_ssh/slovobor.tktk.in-id_rsa.pub 2>/dev/null)
 deploy_remote_install: ## (1) create user, install services (sudo)
 	$(SSH) "$(TARGET)" "\
-	sudo useradd -d $(TARGET_PATH) -m -g $(TARGET_USER_GROUP) -s /bin/false $(TARGET_USER); \
+	sudo useradd -d $(TARGET_PATH) -m -g $(TARGET_USER_GROUP) -s /bin/rbash $(TARGET_USER); \
 	sudo mkdir -pv '$(TARGET_PATH)/.ssh/'; \
 	sudo echo '$(SSH_AUTH_KEY)' > '$(TARGET_PATH)/.ssh/authorized_keys'; \
 	sudo mkdir -pv '$(TARGET_PATH)/_logs' '$(TARGET_PATH)/db'; \
 	sudo touch '$(TARGET_PATH)/_config.env'; \
-	sudo ln -sfv $(TARGET_PATH)/deploy/slovobor.service /etc/systemd/system/;\
+	sudo systemctl link $(TARGET_PATH)/deploy/slovobor.service;\
+	sudo systemctl enable slovobor.service;\
 	sudo ln -sfv $(TARGET_PATH)/deploy/nginx.conf /etc/nginx/sites-enabled/slovobor.conf;\
-	sudo ln -sfv $(TARGET_PATH)/deploy/logrotate.conf /etc/logrotate.d/slovobor.conf;\
 	sudo chown -Rc $(TARGET_USER):$(TARGET_USER_GROUP) $(TARGET_PATH); \
 	sudo chmod -Rc 750 $(TARGET_PATH); \
 	"
@@ -160,7 +160,7 @@ deploy_remote_files: ## (2) copy updated files to TARGET (rsync)
 	rsync -e "$(SSH)" \
 	--chown $(TARGET_USER):$(TARGET_USER_GROUP) \
 	--ignore-missing-args \
-	--update \
+	--size-only \
 	--recursive \
 	--verbose \
 	--delete \
@@ -173,6 +173,9 @@ deploy_remote_reload: ## (3) reload services on TARGET (sudo)
 	$(SSH) "$(TARGET)" "\
 	sudo chown -Rc $(TARGET_USER):$(TARGET_USER_GROUP) $(TARGET_PATH); \
 	sudo chmod -Rc 750 $(TARGET_PATH); \
+	sudo cp $(TARGET_PATH)/deploy/logrotate.conf /etc/logrotate.d/slovobor.conf;\
+	sudo chown -c root /etc/logrotate.d/slovobor.conf; \
+	sudo chmod -c 644 /etc/logrotate.d/slovobor.conf; \
 	sudo systemctl reload nginx; \
 	sudo systemctl daemon-reload; \
 	sudo systemctl restart slovobor; \
